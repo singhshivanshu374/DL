@@ -1,0 +1,80 @@
+import numpy as np
+import tensorflow as tf
+from tensorflow.keras.preprocessing.text import Tokenizer
+from tensorflow.keras.utils import to_categorical
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Embedding, Dense, Lambda
+
+
+
+text = "I love deep learning and deep learning is interesting"
+
+tokenizer = Tokenizer()
+tokenizer.fit_on_texts([text])
+
+vocab_size = len(tokenizer.word_index) + 1
+sequence = tokenizer.texts_to_sequences([text])[0]
+
+print("Vocabulary:", tokenizer.word_index)
+print("Sequence:", sequence)
+print("Vocabulary Size:", vocab_size)
+
+
+
+
+window_size = 2
+
+X = []
+y = []
+
+for i in range(window_size, len(sequence) - window_size):
+    context = sequence[i-window_size:i] + sequence[i+1:i+window_size+1]
+    target = sequence[i]
+
+    X.append(context)
+    y.append(target)
+
+X = np.array(X)
+y = to_categorical(y, num_classes=vocab_size)
+
+print("Training Data:", X)
+print("Target Data:", y.shape)
+
+
+
+
+model = Sequential([
+    Embedding(vocab_size, 10),
+    Lambda(lambda x: tf.reduce_mean(x, axis=1)),
+    Dense(vocab_size, activation='softmax')
+])
+
+model.compile(
+    optimizer='adam',
+    loss='categorical_crossentropy',
+    metrics=['accuracy']
+)
+
+model.fit(X, y, epochs=100, verbose=1)
+
+print("Model Training Completed!")
+
+
+
+
+index_to_word = {v: k for k, v in tokenizer.word_index.items()}
+
+test_context = X[0]
+
+prediction = model.predict(np.array([test_context]), verbose=0)
+
+predicted_word = np.argmax(prediction)
+
+print("Context Words:",
+      [index_to_word[i] for i in test_context])
+
+print("Actual Target Word:",
+      index_to_word[np.argmax(y[0])])
+
+print("Predicted Word:",
+      index_to_word[predicted_word])

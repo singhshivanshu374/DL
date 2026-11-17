@@ -1,0 +1,154 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import tensorflow as tf
+from tensorflow import keras
+import random
+from tensorflow.keras import layers
+
+
+
+
+data = np.load('cifar-10-python.npz')
+
+X_train = data['x_train']
+y_train = data['y_train']
+
+X_test = data['x_test']
+y_test = data['y_test']
+
+
+
+
+print("Training images:", X_train.shape)
+print("Training labels:", y_train.shape)
+
+print("Testing images:", X_test.shape)
+print("Testing labels:", y_test.shape)
+
+
+
+m = np.max(X_train)
+n = np.min(X_train)
+
+normi = m - n
+
+X_train = X_train/ normi
+X_test = X_test/ normi
+
+
+
+class_names = [
+    'airplane', 'automobile', 'bird', 'cat', 'deer',
+    'dog', 'frog', 'horse', 'ship', 'truck'
+]
+
+plt.figure(figsize=(8, 8))
+
+for i in range(16):
+    plt.subplot(4, 4, i + 1)
+    plt.imshow(X_train[i])
+    plt.title(class_names[int(y_train[i])])
+    plt.axis('off')
+
+plt.show()
+
+
+
+
+model = keras.Sequential([
+    layers.Input(shape=(32, 32, 3)),
+
+    layers.Conv2D(32, (3, 3), activation='relu'),
+    layers.MaxPooling2D((2, 2)),
+
+    layers.Conv2D(64, (3, 3), activation='relu'),
+    layers.MaxPooling2D((2, 2)),
+
+    layers.Flatten(),
+
+    layers.Dense(64, activation='relu'),
+
+    layers.Dense(10, activation='softmax')
+])
+
+
+
+
+model.summary()
+
+
+model.compile(
+    optimizer=keras.optimizers.Adam(learning_rate=0.001),
+    loss='sparse_categorical_crossentropy',
+    metrics=['accuracy']
+)
+
+
+early_stop = keras.callbacks.EarlyStopping(
+    monitor='val_loss',
+    patience=3,
+    restore_best_weights=True
+)
+
+
+
+
+history = model.fit(
+    X_train,
+    y_train,
+    epochs=10,
+    batch_size=64,
+    validation_split=0.1,
+    callbacks=[early_stop]
+)
+
+
+test_loss, test_accuracy = model.evaluate(X_test, y_test)
+
+print("Test Loss:", test_loss)
+print("Test Accuracy: {:.2f}%".format(test_accuracy * 100))
+
+
+
+
+plt.plot(history.history['accuracy'], label='Training Accuracy')
+plt.plot(history.history['val_accuracy'], label='Validation Accuracy')
+
+plt.xlabel('Epochs')
+plt.ylabel('Accuracy')
+plt.title('Training and Validation Accuracy')
+
+plt.legend()
+plt.show()
+
+
+
+plt.plot(history.history['loss'], label='Training Loss')
+plt.plot(history.history['val_loss'], label='Validation Loss')
+
+plt.xlabel('Epochs')
+plt.ylabel('Loss')
+plt.title('Training and Validation Loss')
+
+plt.legend()
+plt.show()
+
+
+
+
+n = random.randint(0,len(X_test)-1)
+plt.imshow(X_test[n],cmap='gray')
+plt.title("Test Image")
+plt.show()
+
+pred = model.predict(X_test[n].reshape(1,32,32,3))
+predicted_class = np.argmax(pred)
+print("Predicted class is : ",class_names[predicted_class])
+print("Actual class is : ",class_names[int(y_test[n])])
+
+
+
+
+
+
+

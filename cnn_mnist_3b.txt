@@ -1,0 +1,48 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from tensorflow import keras
+
+
+data = np.load("mnist.npz")
+x_train, y_train = data["x_train"], data["y_train"]
+x_test, y_test = data["x_test"], data["y_test"]
+
+x_train = x_train.reshape(-1, 28, 28, 1) / 255.0
+x_test = x_test.reshape(-1, 28, 28, 1) / 255.0
+
+model = keras.Sequential([
+    keras.Input(shape=(28, 28, 1)),
+    keras.layers.Conv2D(32, (3, 3), activation="relu"),
+    keras.layers.MaxPooling2D((2, 2)),
+    keras.layers.Flatten(),
+    keras.layers.Dense(64, activation="relu"),
+    keras.layers.Dropout(0.2),
+    keras.layers.Dense(10, activation="softmax")
+])
+
+model.summary()
+
+model.compile(
+    optimizer="adam",
+    loss="sparse_categorical_crossentropy",
+    metrics=["accuracy"]
+)
+
+history = model.fit(x_train, y_train, epochs=5)
+
+plt.plot(history.history["accuracy"], label="Training accuracy")
+plt.plot(history.history["loss"], label="Training loss")
+plt.xlabel("Epoch")
+plt.legend()
+plt.show()
+
+loss, acc = model.evaluate(x_test, y_test)
+print(f"Test accuracy: {acc * 100:.2f}%")
+
+pred = model.predict(x_test[:1])
+print("Predicted:", pred.argmax(), "Actual:", y_test[0])
+
+plt.imshow(x_test[0].reshape(28, 28), cmap="gray")
+plt.title(f"Predicted: {pred.argmax()} Actual: {y_test[0]}")
+plt.axis("off")
+plt.show()
