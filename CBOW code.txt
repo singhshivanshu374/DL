@@ -1,0 +1,139 @@
+# Import NumPy for numerical operations and array handling
+import numpy as np
+
+# Import TensorFlow for deep learning operations
+import tensorflow as tf
+
+# Import Tokenizer to convert words into numerical IDs
+from tensorflow.keras.preprocessing.text import Tokenizer
+
+# Import to_categorical to convert labels into one-hot encoding
+from tensorflow.keras.utils import to_categorical
+
+# Import Sequential to create a neural network model
+from tensorflow.keras.models import Sequential
+
+# Import Embedding, Dense and Lambda layers
+from tensorflow.keras.layers import Embedding, Dense, Lambda
+
+
+# Input sentence for training the CBOW model
+text = "I love deep learning and deep learning is interesting"
+
+
+# Create a tokenizer object
+tokenizer = Tokenizer()
+
+# Analyse the sentence and create a vocabulary of unique words
+tokenizer.fit_on_texts([text])
+
+# Calculate vocabulary size (+1 for reserved padding index 0)
+vocab_size = len(tokenizer.word_index) + 1
+
+# Convert the sentence into numerical word IDs
+sequence = tokenizer.texts_to_sequences([text])[0]
+
+# Display vocabulary, numerical sequence and vocabulary size
+print("Vocabulary:", tokenizer.word_index)
+print("Sequence:", sequence)
+print("Vocabulary Size:", vocab_size)
+
+
+# Define context window size
+# 2 means two words before and two words after the target
+window_size = 2
+
+# X will store the surrounding context words
+X = []
+
+# y will store the target (middle) words
+y = []
+
+
+# Loop through the numerical sequence to generate training samples
+for i in range(window_size, len(sequence) - window_size):
+
+    # Select two words before and two words after the target word
+    context = sequence[i-window_size:i] + sequence[i+1:i+window_size+1]
+
+    # Select the middle word as the target
+    target = sequence[i]
+
+    # Store context words in X
+    X.append(context)
+
+    # Store target word in y
+    y.append(target)
+
+
+# Convert input training data into a NumPy array
+X = np.array(X)
+
+# Convert target word IDs into one-hot encoded vectors
+y = to_categorical(y, num_classes=vocab_size)
+
+# Display the generated training data and target shape
+print("Training Data:", X)
+print("Target Data:", y.shape)
+
+
+# Create the CBOW neural network using Sequential
+model = Sequential([
+
+    # Convert each word ID into a 10-dimensional embedding vector
+    Embedding(vocab_size, 10),
+
+    # Calculate the average of all context word embeddings
+    Lambda(lambda x: tf.reduce_mean(x, axis=1)),
+
+    # Predict the target word using Softmax probabilities
+    Dense(vocab_size, activation='softmax')
+])
+
+
+# Compile the model before training
+model.compile(
+
+    # Adam optimizer updates the model weights
+    optimizer='adam',
+
+    # Categorical cross-entropy calculates prediction error
+    loss='categorical_crossentropy',
+
+    # Accuracy measures correct predictions
+    metrics=['accuracy']
+)
+
+
+# Train the CBOW model for 100 epochs
+model.fit(X, y, epochs=100, verbose=1)
+
+# Display training completion message
+print("Model Training Completed!")
+
+
+# Reverse the vocabulary mapping (convert IDs back into words)
+index_to_word = {v: k for k, v in tokenizer.word_index.items()}
+
+
+# Select the first context sample for prediction
+test_context = X[0]
+
+# Predict the target word from the selected context
+# Add batch dimension using np.array()
+prediction = model.predict(np.array([test_context]), verbose=0)
+
+# Select the index having the highest predicted probability
+predicted_word = np.argmax(prediction)
+
+# Display the context words
+print("Context Words:",
+      [index_to_word[i] for i in test_context])
+
+# Display the actual target word
+print("Actual Target Word:",
+      index_to_word[np.argmax(y[0])])
+
+# Display the predicted target word
+print("Predicted Word:",
+      index_to_word[predicted_word])

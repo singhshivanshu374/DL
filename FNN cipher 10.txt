@@ -1,0 +1,266 @@
+
+# ==========================================================
+# 1. IMPORT LIBRARIES
+# ==========================================================
+
+# Import TensorFlow for deep learning operations
+import tensorflow as tf
+
+# Import Keras to build and train the ANN model
+from tensorflow import keras
+
+# Import different neural network layers
+from tensorflow.keras import layers
+
+# Import NumPy for numerical and array operations
+import numpy as np
+
+# Import Matplotlib for displaying images and plotting graphs
+import matplotlib.pyplot as plt
+
+# Import random to select a random test image
+import random
+
+# Import warnings to manage warning messages
+import warnings
+
+# Ignore warning messages
+warnings.filterwarnings("ignore")
+
+
+# ==========================================================
+# 2. LOAD DATASET
+# ==========================================================
+
+# Load the CIFAR-10 dataset from the NPZ file
+data = np.load('cifar-10-python.npz')
+
+# Extract training images and their corresponding labels
+x_train, y_train = data['x_train'], data['y_train']
+
+# Extract testing images and their corresponding labels
+x_test, y_test = data['x_test'], data['y_test']
+
+# Display the shapes of training and testing images
+print("Training data:", x_train.shape)
+print("Testing data:", x_test.shape)
+
+
+# ==========================================================
+# 3. NORMALIZE DATA
+# ==========================================================
+
+# Find the maximum pixel value in the training images
+m = np.max(x_train)
+
+# Find the minimum pixel value in the training images
+n = np.min(x_train)
+
+# Calculate the difference between maximum and minimum values
+normalised_value = m - n
+
+# Display maximum and minimum pixel values
+print("Max pixel value:", m)
+print("Min pixel value:", n)
+
+# Normalize training images to approximately the range 0 to 1
+x_train = x_train / normalised_value
+
+# Normalize testing images using the same value
+x_test = x_test / normalised_value
+
+
+# ==========================================================
+# 4. VISUALIZE UNIQUE CLASSES
+# ==========================================================
+
+# Find all unique class labels in the training dataset
+# return_index=True also gives the first position of each class
+unique_labels, idx = np.unique(y_train, return_index=True)
+
+# Create a figure with 2 rows and 5 columns
+# This provides 10 spaces for displaying all 10 classes
+fig, ax = plt.subplots(2, 5, figsize=(10, 5))
+
+# Loop through all unique class labels
+for i, label in enumerate(unique_labels):
+
+    # Display the first image belonging to the current class
+    # cmap='gray' is included in the original code
+    ax.flat[i].imshow(x_train[idx[i]], cmap='gray')
+
+    # Display the numerical class label above the image
+    ax.flat[i].set_title(f"Label: {label}")
+
+    # Hide the x-axis and y-axis
+    ax.flat[i].axis('off')
+
+# Add a common title to the figure
+plt.suptitle("Unique Digits from MNIST Dataset")
+
+# Display all images
+plt.show()
+
+
+# ==========================================================
+# 5. CREATE ANN MODEL
+# ==========================================================
+
+# Create a Sequential Artificial Neural Network
+model = keras.Sequential([
+
+    # Flatten each 32x32x3 color image into a 1D array
+    # 32 x 32 x 3 = 3072 input values
+    layers.Flatten(input_shape=(32, 32, 3)),
+
+    # First hidden layer containing 256 neurons
+    # ReLU activation helps learn non-linear patterns
+    layers.Dense(256, activation='relu'),
+
+    # Randomly disable 20% of neurons during training
+    # This helps prevent overfitting
+    layers.Dropout(0.2),
+
+    # Second hidden layer containing 128 neurons
+    layers.Dense(128, activation='relu'),
+
+    # Apply dropout again to reduce overfitting
+    layers.Dropout(0.2),
+
+    # Third hidden layer containing 64 neurons
+    layers.Dense(64, activation='relu'),
+
+    # Output layer with 10 neurons for 10 CIFAR-10 classes
+    # Softmax produces probabilities for each class
+    layers.Dense(10, activation='softmax')
+])
+
+
+# ==========================================================
+# 6. COMPILE MODEL
+# ==========================================================
+
+# Configure the ANN model before training
+model.compile(
+
+    # Use Stochastic Gradient Descent as the optimizer
+    # Learning rate determines the size of weight updates
+    optimizer=keras.optimizers.SGD(learning_rate=0.01),
+
+    # Calculate prediction error for integer class labels
+    loss='sparse_categorical_crossentropy',
+
+    # Measure the percentage of correct predictions
+    metrics=['accuracy']
+)
+
+
+# ==========================================================
+# 7. TRAIN MODEL
+# ==========================================================
+
+# Train the ANN using training images and their labels
+history = model.fit(
+
+    # Input training images
+    x_train,
+
+    # Actual class labels
+    y_train,
+
+    # Train for 10 epochs
+    epochs=10,
+
+    # Reserve 20% of training data for validation
+    validation_split=0.2,
+
+    # Display one line of progress per epoch
+    verbose=2
+)
+
+
+# ==========================================================
+# 8. EVALUATE MODEL
+# ==========================================================
+
+# Evaluate the trained model using unseen testing images
+# Returns test loss and test accuracy
+loss, acc = model.evaluate(x_test, y_test, verbose=2)
+
+# Display test accuracy as a percentage
+print(f"Test Accuracy: {acc*100:.2f}%")
+
+
+# ==========================================================
+# 9. PREDICT RANDOM IMAGE
+# ==========================================================
+
+# Select a random index from the testing dataset
+n = random.randint(0, len(x_test)-1)
+
+# Display the randomly selected test image
+plt.imshow(x_test[n], cmap='gray')
+
+# Set the image title
+plt.title("Test Image")
+
+# Display the image
+plt.show()
+
+# Add a batch dimension to the selected image
+# Predict its class and select the class with the highest probability
+pred = np.argmax(
+    model.predict(np.expand_dims(x_test[n], axis=0))[0]
+)
+
+# Display the predicted class number
+print("Predicted Digit:", pred)
+
+
+# ==========================================================
+# 10. PLOT ACCURACY AND LOSS
+# ==========================================================
+
+# Create a figure of size 10x4 inches
+plt.figure(figsize=(10, 4))
+
+# Create the first subplot for accuracy
+plt.subplot(1, 2, 1)
+
+# Plot training accuracy
+plt.plot(history.history['accuracy'], label='Train Acc')
+
+# Plot validation accuracy
+plt.plot(history.history['val_accuracy'], label='Val Acc')
+
+# Set graph title and axis labels
+plt.title('Model Accuracy')
+plt.xlabel('Epoch')
+plt.ylabel('Accuracy')
+
+# Display the legend
+plt.legend()
+
+
+# Create the second subplot for loss
+plt.subplot(1, 2, 2)
+
+# Plot training loss
+plt.plot(history.history['loss'], label='Train Loss')
+
+# Plot validation loss
+plt.plot(history.history['val_loss'], label='Val Loss')
+
+# Set graph title and axis labels
+plt.title('Model Loss')
+plt.xlabel('Epoch')
+plt.ylabel('Loss')
+
+# Display the legend
+plt.legend()
+
+# Display grid lines
+plt.grid(True)
+
+# Display both graphs
+plt.show()

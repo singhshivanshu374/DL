@@ -1,0 +1,237 @@
+
+# Import NumPy for numerical operations and array handling
+import numpy as np
+
+# Import Matplotlib for displaying images and plotting graphs
+import matplotlib.pyplot as plt
+
+# Import TensorFlow and Keras for building and training the deep learning model
+import tensorflow as tf
+from tensorflow import keras
+
+# Import random to select a random test image
+import random
+
+# Import CNN layers such as Conv2D, MaxPooling2D, Flatten and Dense
+from tensorflow.keras import layers
+
+
+# Load the CIFAR-10 dataset from the NPZ file
+data = np.load('cifar-10-python.npz')
+
+# Extract training images and their corresponding labels
+X_train = data['x_train']
+y_train = data['y_train']
+
+# Extract testing images and their corresponding labels
+X_test = data['x_test']
+y_test = data['y_test']
+
+
+# Display the shape of training and testing images and labels
+print("Training images:", X_train.shape)
+print("Training labels:", y_train.shape)
+
+print("Testing images:", X_test.shape)
+print("Testing labels:", y_test.shape)
+
+
+# Find the maximum pixel value in the training images
+m = np.max(X_train)
+
+# Find the minimum pixel value in the training images
+n = np.min(X_train)
+
+# Calculate the difference between maximum and minimum pixel values
+normi = m - n
+
+# Normalize training and testing images to approximately the range 0 to 1
+# CIFAR-10 pixel values normally range from 0 to 255, with minimum 0
+X_train = X_train / normi
+X_test = X_test / normi
+
+
+# Define the names of all 10 CIFAR-10 classes
+# The index of each name corresponds to its numerical label
+class_names = [
+    'airplane', 'automobile', 'bird', 'cat', 'deer',
+    'dog', 'frog', 'horse', 'ship', 'truck'
+]
+
+
+# Create a figure of size 8 by 8 inches
+plt.figure(figsize=(8, 8))
+
+# Display the first 16 training images
+for i in range(16):
+
+    # Arrange images in a grid of 4 rows and 4 columns
+    plt.subplot(4, 4, i + 1)
+
+    # Display the current training image
+    plt.imshow(X_train[i])
+
+    # Display the actual class name of the image
+    plt.title(class_names[int(y_train[i])])
+
+    # Hide the x-axis and y-axis
+    plt.axis('off')
+
+# Display the complete image grid
+plt.show()
+
+
+# Create a Sequential CNN model
+model = keras.Sequential([
+
+    # Define the input image shape: 32 pixels height, 32 pixels width, 3 RGB channels
+    layers.Input(shape=(32, 32, 3)),
+
+    # First convolutional layer with 32 filters of size 3x3
+    # ReLU activation introduces non-linearity and helps learn image features
+    layers.Conv2D(32, (3, 3), activation='relu'),
+
+    # Max pooling reduces the spatial dimensions of feature maps
+    layers.MaxPooling2D((2, 2)),
+
+    # Second convolutional layer with 64 filters of size 3x3
+    # Learns more complex features from the previous feature maps
+    layers.Conv2D(64, (3, 3), activation='relu'),
+
+    # Reduce the feature map dimensions again using max pooling
+    layers.MaxPooling2D((2, 2)),
+
+    # Convert the 2D feature maps into a one-dimensional vector
+    layers.Flatten(),
+
+    # Fully connected layer with 64 neurons and ReLU activation
+    layers.Dense(64, activation='relu'),
+
+    # Output layer with 10 neurons, one for each CIFAR-10 class
+    # Softmax produces probabilities for all 10 classes
+    layers.Dense(10, activation='softmax')
+])
+
+
+# Display the model architecture, output shapes and number of parameters
+model.summary()
+
+
+# Configure the model before training
+model.compile(
+
+    # Adam optimizer updates model weights to reduce prediction error
+    optimizer=keras.optimizers.Adam(learning_rate=0.001),
+
+    # Sparse categorical crossentropy is used because labels are integers (0 to 9)
+    loss='sparse_categorical_crossentropy',
+
+    # Accuracy measures the percentage of correct predictions
+    metrics=['accuracy']
+)
+
+
+# Define Early Stopping to prevent unnecessary training and reduce overfitting
+early_stop = keras.callbacks.EarlyStopping(
+
+    # Monitor validation loss after every epoch
+    monitor='val_loss',
+
+    # Stop training if validation loss does not improve for 3 consecutive epochs
+    patience=3,
+
+    # Restore the model weights from the epoch with the best validation loss
+    restore_best_weights=True
+)
+
+
+# Train the CNN model using the training images and labels
+history = model.fit(
+
+    # Input training images
+    X_train,
+
+    # Actual labels of training images
+    y_train,
+
+    # Maximum number of training iterations over the complete training dataset
+    epochs=10,
+
+    # Process 64 images in one batch before updating model weights
+    batch_size=64,
+
+    # Use 10% of the training data for validation
+    validation_split=0.1,
+
+    # Apply the Early Stopping callback during training
+    callbacks=[early_stop]
+)
+
+
+# Evaluate the trained model on unseen testing data
+test_loss, test_accuracy = model.evaluate(X_test, y_test)
+
+# Display the test loss
+print("Test Loss:", test_loss)
+
+# Display test accuracy as a percentage with two decimal places
+print("Test Accuracy: {:.2f}%".format(test_accuracy * 100))
+
+
+# Plot training accuracy against validation accuracy
+plt.plot(history.history['accuracy'], label='Training Accuracy')
+plt.plot(history.history['val_accuracy'], label='Validation Accuracy')
+
+# Set labels and title of the graph
+plt.xlabel('Epochs')
+plt.ylabel('Accuracy')
+plt.title('Training and Validation Accuracy')
+
+# Display the graph legend
+plt.legend()
+
+# Show the accuracy graph
+plt.show()
+
+
+# Plot training loss against validation loss
+plt.plot(history.history['loss'], label='Training Loss')
+plt.plot(history.history['val_loss'], label='Validation Loss')
+
+# Set labels and title of the graph
+plt.xlabel('Epochs')
+plt.ylabel('Loss')
+plt.title('Training and Validation Loss')
+
+# Display the graph legend
+plt.legend()
+
+# Show the loss graph
+plt.show()
+
+
+# Select a random index from the testing dataset
+n = random.randint(0, len(X_test) - 1)
+
+# Display the randomly selected test image
+plt.imshow(X_test[n], cmap='gray')
+
+# Set the image title
+plt.title("Test Image")
+
+# Display the image
+plt.show()
+
+
+# Predict the class probabilities for the selected image
+# Reshape adds a batch dimension because the model expects a batch of images
+pred = model.predict(X_test[n].reshape(1, 32, 32, 3))
+
+# Find the index of the class having the highest predicted probability
+predicted_class = np.argmax(pred)
+
+# Display the predicted class name
+print("Predicted class is : ", class_names[predicted_class])
+
+# Display the actual class name for comparison
+print("Actual class is : ", class_names[int(y_test[n])])

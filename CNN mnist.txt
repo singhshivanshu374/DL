@@ -1,0 +1,141 @@
+
+# Import NumPy for numerical operations and array handling
+import numpy as np
+
+# Import Matplotlib for displaying images and plotting graphs
+import matplotlib.pyplot as plt
+
+# Import Keras to build and train the deep learning model
+from tensorflow import keras
+
+
+# Load the MNIST dataset from the mnist.npz file
+data = np.load("mnist.npz")
+
+# Extract training images and their corresponding labels
+# x_train contains handwritten digit images
+# y_train contains the actual digit values (0 to 9)
+x_train, y_train = data["x_train"], data["y_train"]
+
+# Extract testing images and their corresponding labels
+x_test, y_test = data["x_test"], data["y_test"]
+
+
+# Reshape training images into the format required by CNN
+# -1 represents the number of images
+# 28, 28 represents image height and width
+# 1 represents one grayscale channel
+# Divide by 255 to normalize pixel values between 0 and 1
+x_train = x_train.reshape(-1, 28, 28, 1) / 255.0
+
+# Reshape and normalize testing images in the same way
+x_test = x_test.reshape(-1, 28, 28, 1) / 255.0
+
+
+# Create a Sequential CNN model
+model = keras.Sequential([
+
+    # Define the input image shape as 28x28 pixels with 1 channel
+    keras.Input(shape=(28, 28, 1)),
+
+    # Convolutional layer with 32 filters of size 3x3
+    # ReLU activation helps the model learn image features
+    keras.layers.Conv2D(32, (3, 3), activation="relu"),
+
+    # Max pooling reduces the size of feature maps
+    # It selects the maximum value from each 2x2 region
+    keras.layers.MaxPooling2D((2, 2)),
+
+    # Convert the 2D feature maps into a one-dimensional vector
+    keras.layers.Flatten(),
+
+    # Fully connected layer containing 64 neurons
+    # ReLU activation helps learn complex patterns
+    keras.layers.Dense(64, activation="relu"),
+
+    # Dropout randomly turns off 20% of neurons during training
+    # This helps reduce overfitting
+    keras.layers.Dropout(0.2),
+
+    # Output layer containing 10 neurons for digits 0 to 9
+    # Softmax produces a probability for each digit
+    keras.layers.Dense(10, activation="softmax")
+])
+
+
+# Display the model architecture and number of parameters
+model.summary()
+
+
+# Compile the model before training
+model.compile(
+
+    # Adam optimizer updates weights to reduce prediction errors
+    optimizer="adam",
+
+    # Used because the actual labels are integer values from 0 to 9
+    loss="sparse_categorical_crossentropy",
+
+    # Accuracy measures the percentage of correct predictions
+    metrics=["accuracy"]
+)
+
+
+# Train the CNN model using training images and their labels
+history = model.fit(
+
+    # Training images
+    x_train,
+
+    # Actual labels of training images
+    y_train,
+
+    # Train the model for 5 complete epochs
+    epochs=5
+)
+
+
+# Plot training accuracy against training loss
+plt.plot(history.history["accuracy"], label="Training accuracy")
+plt.plot(history.history["loss"], label="Training loss")
+
+# Label the x-axis as Epoch
+plt.xlabel("Epoch")
+
+# Display the legend to identify both curves
+plt.legend()
+
+# Display the graph
+plt.show()
+
+
+# Evaluate the trained model using unseen testing images
+# Returns test loss and test accuracy
+loss, acc = model.evaluate(x_test, y_test)
+
+# Display test accuracy as a percentage with two decimal places
+print(f"Test accuracy: {acc * 100:.2f}%")
+
+
+# Select the first testing image and predict its digit
+# x_test[:1] keeps the image in batch format
+pred = model.predict(x_test[:1])
+
+# Find the index of the highest probability
+# This index represents the predicted digit
+print("Predicted:", pred.argmax(), "Actual:", y_test[0])
+
+
+# Display the first testing image
+# Reshape it from (28, 28, 1) to (28, 28) for visualization
+# cmap="gray" displays the image in grayscale
+plt.imshow(x_test[0].reshape(28, 28), cmap="gray")
+
+# Display predicted and actual digit values as the image title
+plt.title(f"Predicted: {pred.argmax()} Actual: {y_test[0]}")
+
+# Hide the x-axis and y-axis
+plt.axis("off")
+
+# Display the final image
+plt.show()
