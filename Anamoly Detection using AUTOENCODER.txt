@@ -1,0 +1,335 @@
+
+# ==========================================================
+# 1. IMPORT LIBRARIES
+# ==========================================================
+
+# Pandas is used to read and manipulate the ECG dataset
+import pandas as pd
+
+# NumPy is used for numerical calculations and array operations
+import numpy as np
+
+# Seaborn is used to visualize the confusion matrix
+import seaborn as sns
+
+# Matplotlib is used to plot graphs
+from matplotlib import pyplot as plt
+
+# Used to divide the dataset into training and testing data
+from sklearn.model_selection import train_test_split
+
+# MinMaxScaler scales numerical values into a fixed range
+from sklearn.preprocessing import MinMaxScaler
+
+# Used to calculate model accuracy and confusion matrix
+from sklearn.metrics import confusion_matrix, accuracy_score
+
+# TensorFlow and Keras are used to create the Autoencoder
+import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras import layers, models
+
+# Adam is the optimizer used to train the Autoencoder
+from tensorflow.keras.optimizers import Adam
+
+
+# ==========================================================
+# 2. LOAD AND PREPARE ECG DATASET
+# ==========================================================
+
+# Read the ECG dataset from the CSV file
+# header=None means the file does not contain column headings
+data = pd.read_csv('ecg.csv', header=None)
+
+# Remove rows containing missing values
+data.dropna(inplace=True)
+
+
+# Separate input features and target labels
+
+# All columns except the last column contain ECG signal values
+X = data.iloc[:, :-1].values
+
+# The last column contains the original class labels
+y = data.iloc[:, -1].values
+
+
+# Convert the original labels into binary labels
+# Original label 1 becomes 1
+# Every other original label becomes 0
+y = (y == 1).astype(int)
+
+
+# ==========================================================
+# 3. SPLIT DATASET INTO TRAINING AND TESTING DATA
+# ==========================================================
+
+# Split the dataset into 80% training and 20% testing data
+x_train, x_test, y_train, y_test = train_test_split(
+    X,
+    y,
+    test_size=0.2,
+
+    # Maintain approximately the same class distribution
+    # in both training and testing datasets
+    stratify=y,
+
+    # Fix the random split so the result is reproducible
+    random_state=42
+)
+
+
+# Keep only training samples whose converted label is 0
+# This is intended to make the Autoencoder learn one class only
+x_train = x_train[y_train == 0]
+
+
+# ==========================================================
+# 4. NORMALIZE ECG DATA
+# ==========================================================
+
+# Create a MinMaxScaler object
+scaler = MinMaxScaler()
+
+# Learn minimum and maximum values from training data
+# and transform training values into the range 0 to 1
+x_train_s = scaler.fit_transform(x_train)
+
+# Apply the SAME scaling learned from training data to test data
+# Do not fit a new scaler on testing data
+x_test_s = scaler.transform(x_test)
+
+
+# Display the shapes of normalized datasets
+print("Train data shape", x_train_s.shape)
+print("Test data shape", x_test_s.shape)
+
+# Expected output:
+# Training data: 1663 rows and 140 features
+# Testing data: 1000 rows and 140 features
+
+
+# ==========================================================
+# 5. CREATE THE AUTOENCODER MODEL
+# ==========================================================
+
+# Find the number of input features
+# Here, each ECG heartbeat contains 140 values
+input_dim = x_train_s.shape[1]
+
+
+# Create a Sequential Autoencoder
+autoencoder = models.Sequential([
+
+    # Define input shape: 140 ECG values
+    layers.Input(shape=(input_dim,)),
+
+    # ---------------- ENCODER ----------------
+
+    # First encoder layer: compress 140 values into 64
+    layers.Dense(64, activation='relu'),
+
+    # Compress 64 values into 32
+    layers.Dense(32, activation='relu'),
+
+    # Compress 32 values into 16
+    layers.Dense(16, activation='relu'),
+
+    # Compress 16 values into 8
+    # This is the bottleneck or latent representation
+    layers.Dense(8, activation='relu'),
+
+
+    # ---------------- DECODER ----------------
+
+    # Reconstruct 8 compressed values into 16
+    layers.Dense(16, activation='relu'),
+
+    # Reconstruct 16 values into 32
+    layers.Dense(32, activation='relu'),
+
+    # Reconstruct 32 values into 64
+    layers.Dense(64, activation='relu'),
+
+    # Final output layer reconstructs all 140 input values
+    # Sigmoid produces output values between 0 and 1
+    layers.Dense(input_dim, activation='sigmoid')
+])
+
+
+# ==========================================================
+# 6. COMPILE THE AUTOENCODER
+# ==========================================================
+
+autoencoder.compile(
+
+    # Adam optimizer updates model weights to reduce reconstruction error
+    optimizer=Adam(learning_rate=0.001),
+
+    # Mean Squared Error measures the difference
+    # between original ECG values and reconstructed values
+    loss='mse',
+
+    # Also display Mean Squared Error as a training metric
+    metrics=['mse']
+)
+
+
+# Display the Autoencoder architecture and parameters
+autoencoder.summary()
+
+
+# ==========================================================
+# 7. TRAIN THE AUTOENCODER
+# ==========================================================
+
+history = autoencoder.fit(
+
+    # Input: normalized training ECG signals
+    x_train_s,
+
+    # Target: the SAME normalized ECG signals
+    # The Autoencoder learns to reconstruct its own input
+    x_train_s,
+
+    # Train the model for 20 epochs
+    epochs=20,
+
+    # Process 512 ECG samples in each batch
+    batch_size=512,
+
+    # Reserve 20% of training samples for validation
+    validation_split=0.2,
+
+    # Display training progress
+    verbose=1
+)
+
+
+# ==========================================================
+# 8. PLOT TRAINING AND VALIDATION LOSS
+# ==========================================================
+
+# Plot training reconstruction loss
+plt.plot(history.history['loss'], label="Training Loss")
+
+# Plot validation reconstruction loss
+plt.plot(history.history['val_loss'], label="Validation loss")
+
+# Label the x-axis
+plt.xlabel("epochs")
+
+# Label the y-axis
+plt.ylabel("Loss")
+
+# Display the legend
+plt.legend()
+
+# Display grid lines
+plt.grid(True)
+
+# Show the graph
+plt.show()
+
+
+# ==========================================================
+# 9. CALCULATE RECONSTRUCTION ERROR
+# ==========================================================
+
+# Reconstruct the training ECG signals
+recon_train = autoencoder.predict(x_train_s)
+
+# Reconstruct the testing ECG signals
+recon_test = autoencoder.predict(x_test_s)
+
+
+# Calculate the Mean Squared Reconstruction Error
+# for every training ECG sample
+# axis=1 calculates error across the 140 features of each sample
+train_err = np.mean(
+    np.square(x_train_s - recon_train),
+    axis=1
+)
+
+# Calculate reconstruction error for every testing ECG sample
+test_err = np.mean(
+    np.square(x_test_s - recon_test),
+    axis=1
+)
+
+
+# ==========================================================
+# 10. CALCULATE RECONSTRUCTION THRESHOLD
+# ==========================================================
+
+# Calculate the mean training reconstruction error
+# and add one standard deviation
+threshold = np.mean(train_err) + np.std(train_err)
+
+
+# ==========================================================
+# 11. CLASSIFY NORMAL AND ANOMALOUS SAMPLES
+# ==========================================================
+
+# If test reconstruction error is greater than threshold,
+# assign predicted label 1
+# Otherwise, assign predicted label 0
+y_pred = [
+    1 if e > threshold else 0
+    for e in test_err
+]
+
+
+# ==========================================================
+# 12. EVALUATE PREDICTIONS
+# ==========================================================
+
+# Compare actual labels with predicted labels
+# and calculate overall classification accuracy
+acc = accuracy_score(y_test, y_pred)
+
+# Create the confusion matrix
+cm = confusion_matrix(y_test, y_pred)
+
+# Display the reconstruction threshold
+print("Reconstruction Threshold: ", threshold)
+
+# Display classification accuracy
+print("Accuracy: ", acc)
+
+# Display confusion matrix
+print("Confusion Matrix :\n", cm)
+
+
+# ==========================================================
+# 13. VISUALIZE CONFUSION MATRIX
+# ==========================================================
+
+# Create a heatmap of the confusion matrix
+sns.heatmap(
+    cm,
+
+    # Display the numerical values inside each cell
+    annot=True,
+
+    # Display numbers as integers
+    fmt="d",
+
+    # Labels for predicted classes
+    xticklabels=["Normal", "Anomaly"],
+
+    # Labels for actual classes
+    yticklabels=["Normal", "Anomaly"]
+)
+
+# Add chart title
+plt.title("Confusion Matrix")
+
+# Label the x-axis
+plt.xlabel("Predicted")
+
+# Label the y-axis
+plt.ylabel("Actual")
+
+# Display the confusion matrix
+plt.show()
